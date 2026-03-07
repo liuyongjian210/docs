@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CEF Windows 构建指南</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 5px;
+        }
+        h3 {
+            color: #7f8c8d;
+            margin-top: 25px;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .note {
+            background-color: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .important {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        code {
+            background-color: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Courier New", monospace;
+            font-size: 0.9em;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            border-radius: 0;
+        }
+        ul, ol {
+            margin: 10px 0;
+            padding-left: 30px;
+        }
+        li {
+            margin: 8px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .toc {
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .toc h2 {
+            margin-top: 0;
+            border-bottom: none;
+            color: #2c3e50;
+        }
+        .toc ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .toc a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .toc a:hover {
+            text-decoration: underline;
+        }
+        .toc li {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CEF Windows 构建指南</h1>
+
+        <div class="toc">
+            <h2>目录</h2>
+            <ul>
+                <li><a href="#overview">概述</a></li>
+                <li><a href="#requirements">系统要求</a></li>
+                <li><a href="#structure">文件结构</a></li>
+                <li><a href="#resources">资源下载</a></li>
+                <li><a href="#steps">Windows 构建步骤</a></li>
+                <li><a href="#branch">构建特定版本分支</a></li>
+            </ul>
+        </div>
+
+        <h2 id="overview">概述</h2>
+        <p>本指南用于设置最小开发环境并构建 Chromium/CEF 的 master 分支进行开发。</p>
+
+        <div class="warning">
+            <strong>注意：</strong> 本指南不适用于：
+            <ul>
+                <li>寻找预构建二进制分发用于第三方应用的用户</li>
+                <li>希望以完全自动化方式构建二进制分发的用户</li>
+            </ul>
+        </div>
+
+        <h2 id="requirements">系统要求</h2>
+        <table>
+            <tr>
+                <th>项目</th>
+                <th>要求</th>
+            </tr>
+            <tr>
+                <td>硬件要求</td>
+                <td>至少 16GB RAM（推荐 32GB+），150GB 可用磁盘空间（用于 Debug 构建）</td>
+            </tr>
+            <tr>
+                <td>构建时间</td>
+                <td>约 4 小时（使用快速网络连接 100Mbps 和快速构建机器 2.4GHz，16 逻辑核心，SSD）</td>
+            </tr>
+            <tr>
+                <td>开发环境</td>
+                <td>可使用专用硬件或 VMware、Parallels、VirtualBox 虚拟机</td>
+            </tr>
+        </table>
+
+        <h2 id="structure">文件结构</h2>
+        <pre><code>~/code/
+  automate/
+    automate-git.py   &lt;-- CEF 构建脚本
+  chromium_git/
+    cef/              &lt;-- CEF 源码检出
+    chromium/
+      src/            &lt;-- Chromium 源码检出
+    update.[bat|sh]   &lt;-- automate-git.py 的引导脚本
+  depot_tools/        &lt;-- Chromium 构建工具</code></pre>
+
+        <div class="important">
+            <strong>重要提示：</strong>
+            <ul>
+                <li>路径中不要包含空格或特殊字符</li>
+                <li>路径总长度应小于 35 个字符</li>
+                <li>只使用 ASCII 字符</li>
+            </ul>
+        </div>
+
+        <h2 id="resources">资源下载</h2>
+        <p>以下是构建 CEF 所需的所有资源下载地址：</p>
+
+        <table>
+            <tr>
+                <th>资源名称</th>
+                <th>下载地址</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>depot_tools</td>
+                <td><a href="https://storage.googleapis.com/chrome-infra/depot_tools.zip" target="_blank">https://storage.googleapis.com/chrome-infra/depot_tools.zip</a></td>
+                <td>Chromium 构建工具包，包含 Python、Git、gclient 等工具</td>
+            </tr>
+            <tr>
+                <td>automate-git.py</td>
+                <td><a href="https://bitbucket.org/chromiumembedded/cef/raw/master/tools/automate-git.py" target="_blank">https://bitbucket.org/chromiumembedded/cef/raw/master/tools/automate-git.py</a></td>
+                <td>CEF 自动化构建脚本，用于下载和配置源码</td>
+            </tr>
+            <tr>
+                <td>CEF 源码仓库</td>
+                <td><a href="https://github.com/chromiumembedded/cef.git" target="_blank">https://github.com/chromiumembedded/cef.git</a></td>
+                <td>CEF 官方 Git 仓库</td>
+            </tr>
+            <tr>
+                <td>Chromium 源码仓库</td>
+                <td><a href="https://chromium.googlesource.com/chromium/src.git" target="_blank">https://chromium.googlesource.com/chromium/src.git</a></td>
+                <td>Chromium 官方 Git 仓库</td>
+            </tr>
+            <tr>
+                <td>Visual Studio</td>
+                <td><a href="https://visualstudio.microsoft.com/downloads/" target="_blank">https://visualstudio.microsoft.com/downloads/</a></td>
+                <td>Visual Studio 2022（推荐）或 2019</td>
+            </tr>
+            <tr>
+                <td>Windows SDK</td>
+                <td><a href="https://developer.microsoft.com/en-us/windows/downloads/windows-sdk/" target="_blank">https://developer.microsoft.com/en-us/windows/downloads/windows-sdk/</a></td>
+                <td>Windows SDK（需要安装特定版本）</td>
+            </tr>
+            <tr>
+                <td>7-Zip</td>
+                <td><a href="https://www.7-zip.org/download.html" target="_blank">https://www.7-zip.org/download.html</a></td>
+                <td>推荐用于解压 depot_tools.zip</td>
+            </tr>
+        </table>
+
+        <div class="note">
+            <strong>下载提示：</strong>
+            <ul>
+                <li>depot_tools.zip 文件较大（约 200MB），请确保网络连接稳定</li>
+                <li>automate-git.py 脚本会自动下载 CEF 和 Chromium 源码，总大小可能超过 100GB</li>
+                <li>建议使用下载管理器或代理工具加速下载</li>
+                <li>如果下载速度较慢，可以考虑使用镜像或代理</li>
+            </ul>
+        </div>
+
+        <h2 id="steps">Windows 构建步骤</h2>
+
+        <h3>1. 创建目录</h3>
+        <pre><code>c:\code\automate
+c:\code\chromium_git</code></pre>
+
+        <h3>2. 下载 depot_tools</h3>
+        <ul>
+            <li>下载 depot_tools.zip 并解压到 <code>c:\code\depot_tools</code></li>
+        </ul>
+        <div class="important">
+            <strong>重要：</strong> 不要使用拖放或复制粘贴方式解压，这不会提取隐藏的 ".git" 文件夹。建议使用右键菜单的"Extract all…"或 7-zip。
+        </div>
+
+        <h3>3. 配置环境变量</h3>
+        <p>将 <code>c:\code\depot_tools</code> 添加到系统 PATH：</p>
+        <ol>
+            <li>运行 <code>SystemPropertiesAdvanced</code> 命令</li>
+            <li>点击"Environment Variables…"按钮</li>
+            <li>双击"System variables"下的"Path"进行编辑</li>
+        </ol>
+        <div class="note">
+            <strong>临时设置（仅当前命令行窗口有效）：</strong>
+            <pre><code>set PATH=D:\code\depot_tools;%PATH%</code></pre>
+            <p>如果不想修改系统环境变量，可以在每次打开新的命令行窗口时运行上述命令来临时设置 PATH。</p>
+        </div>
+
+        <h3>4. 安装 Python 和 Git</h3>
+        <pre><code>cd c:\code\depot_tools
+update_depot_tools.bat</code></pre>
+
+        <div class="note">
+            <strong>说明：</strong>
+            <ul>
+                <li>如果脚本执行失败，可以手动安装 Git 最新版本</li>
+                <li>从 <a href="https://git-scm.com/downloads" target="_blank">https://git-scm.com/downloads</a> 下载并安装 Git</li>
+                <li>安装完成后，将 Git 的安装路径（如 <code>C:\Program Files\Git\cmd</code>）添加到系统 PATH 环境变量中</li>
+                <li>重启命令行窗口，运行 <code>git --version</code> 验证安装是否成功</li>
+            </ul>
+        </div>
+
+        <h3>5. 下载构建脚本</h3>
+        <p>下载 automate-git.py 脚本到 <code>c:\code\automate\automate-git.py</code></p>
+
+        <h3>6. 创建并运行更新脚本</h3>
+        <p>创建 <code>c:\code\chromium_git\update.bat</code>：</p>
+        <pre><code>set http_proxy=http://192.1.255.23:7890
+set https_proxy=http://192.1.255.23:7890
+git config --global http.postBuffer 3048576000
+git config --global http.lowSpeedLimit 0
+git config --global http.lowSpeedTime 999999
+git config --global http.version HTTP/1.1
+git config --global http.sslVerify false
+git config --global http.proxy socks5://192.1.255.23:7890
+git config --global https.proxy socks5://192.1.255.23:7890
+
+set DEPOT_TOOLS_WIN_TOOLCHAIN=0
+set DEPOT_TOOLS_UPDATE=0
+set GN_ARGUMENTS=--ide=vs2022 --sln=cef --filters=//cef/*
+set CEF_VCVARS=C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat
+set GYP_MSVS_VERSION=2022
+set GYP_MSVS_OVERRIDE_PATH=C:\Program Files\Microsoft Visual Studio\2022\Professional
+set WINDOWSSDKDIR=C:\Program Files (x86)\Windows Kits\10
+set CEF_ARCHIVE_FORMAT=tar.bz2
+set GN_DEFINES=ffmpeg_branding=Chrome proprietary_codecs=true is_official_build=true use_sysroot=true symbol_level=1 is_cfi=false use_thin_lto=false use_vaapi=false chrome_pgo_phase=0 is_component_build=false
+set GN_ARGUMENTS=--ide=vs2022 --sln=cef --filters=//cef/*
+::python3 D:\code\automate\automate-git.py --chromium-url=https://github.com/chromium/chromium.git --download-dir=D:\code\chromium_git --depot-tools-dir=D:\code\depot_tools --verbose-build --x64-build --no-debug-build --no-build
+python ..\automate\automate-git.py --download-dir=d:\code\chromium_git --depot-tools-dir=d:\code\depot_tools --no-distrib --no-build --no-chromium-history --force-clean</code></pre>
+
+        <p>运行脚本：</p>
+        <pre><code>cd c:\code\chromium_git
+update.bat</code></pre>
+
+        <p>这将下载：</p>
+        <ul>
+            <li>CEF 源码到 <code>c:\code\chromium_git\cef</code></li>
+            <li>Chromium 源码到 <code>c:\code\chromium_git\chromium\src</code></li>
+            <li>完成后将 CEF 源码复制到 <code>c:\code\chromium_git\chromium\src\cef</code></li>
+        </ul>
+
+        <div class="note">
+            <strong>脚本说明：</strong>
+            <ul>
+                <li>代理设置：配置 HTTP/HTTPS 代理和 SOCKS5 代理，用于加速下载</li>
+                <li>Git 配置：设置缓冲区大小、速度限制和 SSL 验证等参数</li>
+                <li>环境变量：配置 Visual Studio 路径、Windows SDK 路径和构建参数</li>
+                <li>GN_DEFINES：启用 H.264 编解码支持（proprietary_codecs=true）</li>
+                <li>最后一行使用 <code>--force-clean</code> 强制清理，如需更新可改为 <code>--force-update</code></li>
+            </ul>
+        </div>
+
+        <h3>7. 拉取项目依赖</h3>
+        <p>运行 <code>gclient runhooks</code> 来下载和安装所有项目依赖：</p>
+        <pre><code>cd c:\code\chromium_git\chromium
+gclient runhooks</code></pre>
+
+        <div class="note">
+            <strong>重要说明：</strong>
+            <ul>
+                <li>此步骤会下载大量的依赖库和工具，可能需要 30 分钟到 2 小时</li>
+                <li>首次运行时会下载所有依赖，后续运行会更快</li>
+                <li>确保网络连接稳定，如果中断可以重新运行该命令</li>
+                <li>此步骤会自动下载和配置构建工具（如 gn、ninja 等）</li>
+            </ul>
+        </div>
+
+        <h3>8. 配置 H.264 支持</h3>
+        <p>为了支持 H.264 视频编解码，需要创建配置文件并运行更新脚本：</p>
+
+        <p>创建 <code>c:\code\chromium_git\h264_config.txt</code> 文件：</p>
+        <pre><code>#define CONFIG_FLV_DECODER 1
+#define CONFIG_H263_DECODER 1
+#define CONFIG_H263I_DECODER 1
+#define CONFIG_MPEG4_DECODER 1
+#define CONFIG_MPEGVIDEO_DECODER 1
+#define CONFIG_MSMPEG4V1_DECODER 1
+#define CONFIG_MSMPEG4V2_DECODER 1
+#define CONFIG_MSMPEG4V3_DECODER 1
+#define CONFIG_RV10_DECODER 1
+#define CONFIG_RV20_DECODER 1
+#define CONFIG_RV30_DECODER 1
+#define CONFIG_RV40_DECODER 1
+#define CONFIG_AC3_DECODER 1
+#define CONFIG_AMRNB_DECODER 1
+#define CONFIG_AMRWB_DECODER 1
+#define CONFIG_COOK_DECODER 1
+#define CONFIG_SIPR_DECODER 1
+#define CONFIG_FLV_ENCODER 1
+#define CONFIG_H263_ENCODER 1
+#define CONFIG_MPEG4_ENCODER 1
+#define CONFIG_MSMPEG4V2_ENCODER 1
+#define CONFIG_MSMPEG4V3_ENCODER 1
+#define CONFIG_RV10_ENCODER 1
+#define CONFIG_RV20_ENCODER 1
+#define CONFIG_AAC_ENCODER 1
+#define CONFIG_AC3_ENCODER 1
+#define CONFIG_AC3_PARSER 1
+#define CONFIG_COOK_PARSER 1
+#define CONFIG_H263_PARSER 1
+#define CONFIG_MPEG4VIDEO_PARSER 1
+#define CONFIG_MPEGVIDEO_PARSER 1
+#define CONFIG_RV30_PARSER 1
+#define CONFIG_RV40_PARSER 1
+#define CONFIG_SIPR_PARSER 1
+#define CONFIG_AC3_DEMUXER 1
+#define CONFIG_AMR_DEMUXER 1
+#define CONFIG_AMRNB_DEMUXER 1
+#define CONFIG_AMRWB_DEMUXER 1
+#define CONFIG_AVI_DEMUXER 1
+#define CONFIG_AVISYNTH_DEMUXER 1
+#define CONFIG_FLV_DEMUXER 1
+#define CONFIG_H263_DEMUXER 1
+#define CONFIG_H264_DEMUXER 1
+#define CONFIG_MPEGTS_DEMUXER 1
+#define CONFIG_MPEGTSRAW_DEMUXER 1
+#define CONFIG_MPEGVIDEO_DEMUXER 1
+#define CONFIG_RM_DEMUXER 1
+#define CONFIG_AC3_MUXER 1
+#define CONFIG_AMR_MUXER 1
+#define CONFIG_AVI_MUXER 1
+#define CONFIG_FLV_MUXER 1
+#define CONFIG_H263_MUXER 1
+#define CONFIG_H264_MUXER 1
+#define CONFIG_MPEGTS_MUXER 1
+#define CONFIG_RM_MUXER 1</code></pre>
+
+        <p>创建 <code>c:\code\chromium_git\chromium\src\cef\tools\update_h264.py</code> 脚本：</p>
+        <pre><code>import sys
+import shutil
+import re
+import os
+
+def Replace(change,content):
+  str_array = re.findall("#define\s\w+\s",change)
+  str_replace =str_array[0]
+  str_replace+="0"
+  str_dest =str_array[0]
+  str_dest+="1"
+  return content.replace(str_replace,str_dest)
+
+if len(sys.argv) > 2 :
+  src_file_name =sys.argv[1]
+  dest_file_name=sys.argv[2]
+else:
+  src_file_name =raw_input("Please input src file path name:").replace("\r","")
+  dest_file_name =raw_input("Please input dest file path name:").replace("\r","")
+
+print(src_file_name)
+print(dest_file_name)
+
+file_src_handle = open(src_file_name,"r")
+file_src_lines = file_src_handle.readlines()
+file_src_handle.close()
+file_dest_handle = open(dest_file_name,"r")
+dest_file_content = file_dest_handle.read()
+file_dest_handle.close()
+
+for line in file_src_lines:
+  dest_file_content = Replace(line,dest_file_content)
+
+write_file_path = os.getcwd()+"\\"+ os.path.basename(dest_file_name)
+ready_copy = open(write_file_path,"w")
+ready_copy.write(dest_file_content)
+ready_copy.close()
+
+shutil.copy(write_file_path,dest_file_name)
+os.remove(write_file_path)
+print("Support h264 Success!!!")</code></pre>
+
+        <p>创建 <code>c:\code\chromium_git\update_h264.bat</code> 脚本：</p>
+        <pre><code>python update_h264.py D:\code\chromium_git/h264_config.txt D:\code\chromium_git\chromium\src\third_party\ffmpeg\chromium\config\Chrome\win\ia32/config.h
+python update_h264.py D:\code\chromium_git/h264_config.txt D:\code\chromium_git\chromium\src\third_party\ffmpeg\chromium\config\Chrome\win\x64/config.h
+pause</code></pre>
+
+        <p>运行更新脚本：</p>
+        <pre><code>cd c:\code\chromium_git
+update_h264.bat</code></pre>
+
+        <div class="note">
+            <strong>说明：</strong>
+            <ul>
+                <li>此步骤会修改 Chromium 源码以支持 H.264 编解码</li>
+                <li>H.264 是广泛使用的视频编码格式，支持它能播放更多视频内容</li>
+                <li>配置完成后，生成的 CEF 将支持 H.264 视频播放</li>
+                <li>如果不需要 H.264 支持，可以跳过此步骤</li>
+            </ul>
+        </div>
+
+        <h3>9. 生成项目文件</h3>
+        <p>创建 <code>c:\code\chromium_git\chromium\src\cef\create.bat</code>：</p>
+        <pre><code>set GN_DEFINES=is_component_build=true
+set GN_ARGUMENTS=--ide=vs2022 --sln=cef --filters=//cef/*
+call cef_create_projects.bat</code></pre>
+
+        <div class="note">
+            <strong>注意：</strong> 如果使用 Visual Studio Code 而非 Visual Studio，请删除 <code>GN_ARGUMENTS</code> 行。
+        </div>
+
+        <p>运行脚本：</p>
+        <pre><code>cd c:\code\chromium_git\chromium\src\cef
+create.bat</code></pre>
+
+        <p>这将生成 <code>c:\code\chromium_git\chromium\src\out\Debug_GN_x86\cef.sln</code> 文件，可在 Visual Studio 中加载进行调试和编译单个文件。将路径中的 "x86" 替换为 "x64" 可进行 64 位构建。始终使用 Ninja 构建完整项目。</p>
+
+        <h3>10. 使用 Ninja 构建 Debug 版本</h3>
+        <pre><code>cd c:\code\chromium_git\chromium\src
+autoninja -C out\Debug_GN_x86 cef</code></pre>
+
+        <ul>
+            <li>将 "Debug" 替换为 "Release" 可生成 Release 构建</li>
+            <li>将 "x86" 替换为 "x64" 可生成 64 位构建</li>
+        </ul>
+
+        <h3>11. 运行示例应用</h3>
+        <pre><code>cd c:\code\chromium_git\chromium\src
+out\Debug_GN_x86\cefclient.exe</code></pre>
+
+        <h2 id="branch">构建特定版本分支</h2>
+        <p>要构建最新的发布分支而非 master 分支，在 automate-git.py 命令中添加 <code>--branch=XXXX</code> 参数，其中 "XXXX" 是要构建的分支号。</p>
+
+        <div class="warning">
+            <strong>注意：</strong> Chromium 构建要求会随时间变化，在尝试构建发布分支前，请先查看 Branches And Building 页面列出的构建要求。
+        </div>
+
+        <h2 id="references">参考文档</h2>
+        <ul>
+            <li><a href="https://chromium.googlesource.com/chromium/src/+/master/docs/windows_build_instructions.md#Check-python-install" target="_blank">Chromium Windows 构建说明</a> - 官方 Chromium Windows 构建指南</li>
+        </ul>
+
+        <hr>
+        <p style="text-align: center; color: #7f8c8d; margin-top: 40px;">
+            CEF Windows 构建指南 | 基于 Chromium Embedded Framework 官方文档
+        </p>
+    </div>
+</body>
+</html>
