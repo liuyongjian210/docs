@@ -160,6 +160,17 @@ update.bat
 > - GN_DEFINES：启用 H.264 编解码支持（proprietary_codecs=true）
 > - 最后一行使用 `--force-clean` 强制清理，如需更新可改为 `--force-update`
 
+> **错误处理 - UnicodeDecodeError：**
+> 如果在运行 update.bat 时遇到以下错误：
+> ```
+> UnicodeDecodeError: 'gbk' codec can't decode byte 0x90 in position 2: illegal multibyte sequence
+> ```
+> 需要修改 `d:\code\depot_tools\git_common.py` 文件：
+> 1. 打开文件 `d:\code\depot_tools\git_common.py`
+> 2. 找到第 89 行左右的 `with open(path, 'r') as f:`
+> 3. 修改为：`with open(path, 'r', encoding='utf-8', errors='ignore') as f:`
+> 4. 保存文件后重新运行 update.bat
+
 ### 7. 拉取项目依赖
 
 运行 `gclient runhooks` 来下载和安装所有项目依赖：
@@ -174,6 +185,17 @@ gclient runhooks
 > - 首次运行时会下载所有依赖，后续运行会更快
 > - 确保网络连接稳定，如果中断可以重新运行该命令
 > - 此步骤会自动下载和配置构建工具（如 gn、ninja 等）
+
+> **错误处理 - Python 下载失败：**
+> 如果 `gclient sync` 失败，或者卡在 `cef_create_projects.bat` 的报错上，说明 depot_tools 的自动下载机制失败了。最直接的"暴力"解法是：
+> 1. 在 `D:\code\depot_tools` 目录下新建一个文件夹，命名为 `python3_bin_reldir`
+> 2. 将你系统中现有的 `python.exe` 所在的文件夹内容全部复制到这个 `python3_bin_reldir` 文件夹里
+> 3. 在 `D:\code\depot_tools` 根目录下新建文件 `python3_bin_reldir.txt`
+> 4. 在 `python3_bin_reldir.txt` 文件中填入以下内容：
+> ```
+> python3_bin_reldir
+> ```
+> 完成后重新运行 `gclient runhooks` 命令。
 
 ### 8. 配置 H.264 支持
 
@@ -311,6 +333,7 @@ update_h264.bat
 创建 `c:\code\chromium_git\chromium\src\cef\create.bat`：
 
 ```batch
+set DEPOT_TOOLS_WIN_TOOLCHAIN=0
 set GN_DEFINES=is_component_build=true
 set GN_ARGUMENTS=--ide=vs2022 --sln=cef --filters=//cef/*
 call cef_create_projects.bat
