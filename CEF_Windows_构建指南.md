@@ -118,13 +118,7 @@ update_depot_tools.bat
 ```batch
 set http_proxy=http://192.1.255.23:7890
 set https_proxy=http://192.1.255.23:7890
-git config --global http.postBuffer 3048576000
-git config --global http.lowSpeedLimit 0
-git config --global http.lowSpeedTime 999999
-git config --global http.version HTTP/1.1
-git config --global http.sslVerify false
-git config --global http.proxy socks5://192.1.255.23:7890
-git config --global https.proxy socks5://192.1.255.23:7890
+
 
 set DEPOT_TOOLS_WIN_TOOLCHAIN=0
 set DEPOT_TOOLS_UPDATE=0
@@ -136,8 +130,8 @@ set WINDOWSSDKDIR=C:\Program Files (x86)\Windows Kits\10
 set CEF_ARCHIVE_FORMAT=tar.bz2
 set GN_DEFINES=ffmpeg_branding=Chrome proprietary_codecs=true is_official_build=true use_sysroot=true symbol_level=1 is_cfi=false use_thin_lto=false use_vaapi=false chrome_pgo_phase=0 is_component_build=false
 set GN_ARGUMENTS=--ide=vs2022 --sln=cef --filters=//cef/*
-::python3 D:\code\automate\automate-git.py --chromium-url=https://github.com/chromium/chromium.git --download-dir=D:\code\chromium_git --depot-tools-dir=D:\code\depot_tools --verbose-build --x64-build --no-debug-build --no-build
-python ..\automate\automate-git.py --download-dir=d:\code\chromium_git --depot-tools-dir=d:\code\depot_tools --no-distrib --no-build --no-chromium-history --force-clean
+::python3 D:\code\automate\automate-git.py --chromium-url=https://github.com/chromium/chromium.git --download-dir=D:\code\chromium_git --depot-tools-dir=D:\code\depot_tools --verbose-build --x64-build --no-debug-build --no-build --force-clean
+python ..\automate\automate-git.py --download-dir=d:\code\chromium_git --depot-tools-dir=d:\code\depot_tools --branch=7632 --chromium-checkout=refs/tags/145.0.7632.110 --checkout=6ed7554 --no-distrib --no-build --no-chromium-history --force-update
 ```
 
 运行脚本：
@@ -154,11 +148,26 @@ update.bat
 - 完成后将 CEF 源码复制到 `c:\code\chromium_git\chromium\src\cef`
 
 > **脚本说明：**
-> - 代理设置：配置 HTTP/HTTPS 代理和 SOCKS5 代理，用于加速下载
-> - Git 配置：设置缓冲区大小、速度限制和 SSL 验证等参数
+> - 代理设置：配置 HTTP/HTTPS 代理，用于加速下载
 > - 环境变量：配置 Visual Studio 路径、Windows SDK 路径和构建参数
 > - GN_DEFINES：启用 H.264 编解码支持（proprietary_codecs=true）
-> - 最后一行使用 `--force-clean` 强制清理，如需更新可改为 `--force-update`
+> - `--branch=7632`：指定 CEF 分支号
+> - `--chromium-checkout=refs/tags/145.0.7632.110`：指定 Chromium 标签版本
+> - `--checkout=6ed7554`：指定 CEF 提交哈希
+> - `--force-update`：强制更新（首次构建可使用 `--force-clean`）
+
+> **重要提示 - CefSharp 版本匹配：**
+> 如果你使用 [CefSharp](https://github.com/cefsharp/CefSharp)（.NET 绑定），必须确保 CEF 版本与 CefSharp 版本严格一致。版本不匹配会导致运行时错误和崩溃。
+> 
+> **如何查看版本对应关系：**
+> - 查看 [CefSharp GitHub](https://github.com/cefsharp/CefSharp) 仓库的 Release Branches 表格
+> - 查看 [CEF Bitbucket](https://bitbucket.org/chromiumembedded/cef/branches/) 的分支列表
+> - 例如：CefSharp 143 分支对应 CEF 7499 版本
+> 
+> **建议：**
+> - 在构建 CEF 之前，先确定你要使用的 CefSharp 版本
+> - 根据 CefSharp 版本选择对应的 CEF 分支进行构建
+> - 使用 `--branch=XXXX` 参数指定 CEF 分支号
 
 > **错误处理 - UnicodeDecodeError：**
 > 如果在运行 update.bat 时遇到以下错误：
@@ -197,7 +206,10 @@ gclient runhooks
 > ```
 > 完成后重新运行 `gclient runhooks` 命令。
 
-### 8. 配置 H.264 支持
+### 8. 配置 H.264 支持（已废弃）
+
+> **此步骤已废弃：**
+> H.264 支持现在通过 GN_DEFINES 参数在步骤 6 和步骤 9 中启用，不再需要手动修改配置文件。请跳过此步骤。
 
 为了支持 H.264 视频编解码，需要创建配置文件并运行更新脚本：
 
@@ -334,7 +346,7 @@ update_h264.bat
 
 ```batch
 set DEPOT_TOOLS_WIN_TOOLCHAIN=0
-set GN_DEFINES=is_component_build=true
+set GN_DEFINES=is_component_build=true proprietary_codecs=true ffmpeg_branding=Chrome
 set GN_ARGUMENTS=--ide=vs2022 --sln=cef --filters=//cef/*
 call cef_create_projects.bat
 ```
@@ -350,15 +362,26 @@ create.bat
 
 这将生成 `c:\code\chromium_git\chromium\src\out\Debug_GN_x86\cef.sln` 文件，可在 Visual Studio 中加载进行调试和编译单个文件。将路径中的 "x86" 替换为 "x64" 可进行 64 位构建。始终使用 Ninja 构建完整项目。
 
-### 10. 使用 Ninja 构建 Debug 版本
+### 10. 使用 Ninja 构建
+
+构建 Debug 版本（32 位）：
 
 ```bash
 cd c:\code\chromium_git\chromium\src
-autoninja -C out\Debug_GN_x86 cef
+ninja -C out\Debug_GN_x86 cef
 ```
 
-- 将 "Debug" 替换为 "Release" 可生成 Release 构建
-- 将 "x86" 替换为 "x64" 可生成 64 位构建
+构建 Release 版本（64 位）：
+
+```bash
+cd c:\code\chromium_git\chromium\src
+ninja -C out\Release_GN_x64 cef
+```
+
+> **说明：**
+> - 将 "Debug" 替换为 "Release" 可生成 Release 构建
+> - 将 "x86" 替换为 "x64" 可生成 64 位构建
+> - 使用 `ninja` 而非 `autoninja` 命令
 
 ### 11. 运行示例应用
 
@@ -366,6 +389,40 @@ autoninja -C out\Debug_GN_x86 cef
 cd c:\code\chromium_git\chromium\src
 out\Debug_GN_x86\cefclient.exe
 ```
+
+> **错误处理 - cefclient.exe 没有窗口：**
+> 如果执行 cefclient.exe 时没有窗口显示，这通常是一个 Web App 数据库版本冲突。简单来说，你当前的 cefclient.exe（版本 6）试图读取一个由更高版本 Chromium（版本 7）生成的 User Data（用户数据目录）。这通常是因为你之前运行过其他版本（或更高版本）的 Chrome/CEF，残留的配置文件导致了初始化失败。
+> 
+> **解决方法：**
+> 
+> **1. 清理缓存目录（最推荐）**
+> CEF 默认会在用户的 AppData 下生成数据。请删除以下目录，强制程序重新生成纯净的数据：
+> 1. 按下 Win + R，输入 `%LOCALAPPDATA%` 并回车
+> 2. 找到并删除名为 CEF 的文件夹（或者如果你在代码里指定了 cache_path，请清理对应的位置）
+> 
+> **2. 使用临时测试目录运行**
+> 你可以通过命令行指定一个不存在的临时目录，看看程序能否正常启动：
+> ```bash
+> .\cefclient.exe --no-sandbox --user-data-dir="D:\cef_test_data"
+> ```
+> 
+> **为什么会发生这种情况？**
+> - **版本回退：**你可能在本地切换过 Chromium 的分支（例如从 main 切回了某个 branch），但数据目录没有同步清理
+> - **共享路径：**如果你在开发多个基于 CEF 的项目，它们可能都在共用同一个默认的 AppData\Local\CEF 路径
+
+### 12. 生成发布包
+
+构建完成后，可以使用 make_distrib.bat 脚本生成发布包：
+
+```bash
+d:\code\chromium_git\chromium\src\cef\tools\make_distrib.bat --ninja-build --x64-build --allow-partial
+```
+
+> **说明：**
+> - `--ninja-build`：使用 Ninja 构建系统
+> - `--x64-build`：生成 64 位版本
+> - `--allow-partial`：允许部分构建，即使某些组件构建失败也继续
+> - 发布包将生成在 `c:\code\chromium_git\chromium\src\cef\binary_distrib` 目录下
 
 ## 构建特定版本分支
 
